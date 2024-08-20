@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/cometbft/cometbft-load-test/pkg/loadtest"
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -12,6 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module/testutil"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	"github.com/cosmos/cosmos-sdk/x/consensus"
 	distr "github.com/cosmos/cosmos-sdk/x/distribution"
@@ -75,11 +77,35 @@ func main() {
 		panic("USER2_MNEMONIC env var not set")
 	}
 
+	chainId := os.Getenv("CHAIN_ID")
+	if chainId == "" {
+		panic("CHAIN_ID env var not set")
+	}
+
+	rpcUrl := os.Getenv("RPC_URL")
+	if rpcUrl == "" {
+		panic("RPC_URL env var not set")
+	}
+
 	types.GetConfig().SetBech32PrefixForAccount("manifest", "manifestpub")
+
+	rpcClient, err := client.NewClientFromNode(rpcUrl)
+	if err != nil {
+		panic(err)
+	}
 
 	enc := defaultEncoding()
 	cdc := codec.NewProtoCodec(enc.InterfaceRegistry)
 	kr := keyring.NewInMemory(cdc)
+
+	txConfig := authtx.NewTxConfig(cdc, authtx.DefaultSignModes)
+	clientCtx := client.Context{}.
+		WithClient(rpcClient).
+		WithAccountRetriever(authtypes.AccountRetriever{}).
+		WithChainID(chainId).WithCodec(cdc).
+		WithKeyring(kr).
+		WithInterfaceRegistry(enc.InterfaceRegistry).
+		WithTxConfig(txConfig)
 
 	user1, err := recordFromMnmonic(kr, "user1", user1Mnemonic)
 	if err != nil {
@@ -101,8 +127,7 @@ func main() {
 	}
 	slog.Info("User2 address: ", "addr", addr2.String())
 
-	txConfig := authtx.NewTxConfig(cdc, authtx.DefaultSignModes)
-	cosmosClientFactory := manifestledgerloadtest.NewCosmosClientFactory(txConfig, kr)
+	cosmosClientFactory := manifestledgerloadtest.NewCosmosClientFactory(clientCtx)
 	if err := loadtest.RegisterClientFactory("manifest-ledger-load-test", cosmosClientFactory); err != nil {
 		panic(err)
 	}

@@ -3,10 +3,10 @@ package manifestledgerloadtest
 import (
 	"context"
 	"fmt"
+	"math/rand"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
-	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
@@ -17,17 +17,15 @@ import "github.com/cometbft/cometbft-load-test/pkg/loadtest"
 
 // CosmosClientFactory creates instances of CosmosClient
 type CosmosClientFactory struct {
-	txConfig client.TxConfig
-	kr       keyring.Keyring
+	clientCtx client.Context
 }
 
 // CosmosClientFactory implements loadtest.ClientFactory
 var _ loadtest.ClientFactory = (*CosmosClientFactory)(nil)
 
-func NewCosmosClientFactory(txConfig client.TxConfig, kr keyring.Keyring) *CosmosClientFactory {
+func NewCosmosClientFactory(clientCtx client.Context) *CosmosClientFactory {
 	return &CosmosClientFactory{
-		txConfig: txConfig,
-		kr:       kr,
+		clientCtx: clientCtx,
 	}
 }
 
@@ -36,8 +34,7 @@ func NewCosmosClientFactory(txConfig client.TxConfig, kr keyring.Keyring) *Cosmo
 // each client will be responsible for maintaining its own state in a
 // thread-safe manner.
 type CosmosClient struct {
-	txConfig client.TxConfig
-	kr       keyring.Keyring
+	clientCtx client.Context
 }
 
 // CosmosClient implements loadtest.Client
@@ -51,8 +48,7 @@ func (f *CosmosClientFactory) ValidateConfig(cfg loadtest.Config) error {
 
 func (f *CosmosClientFactory) NewClient(cfg loadtest.Config) (loadtest.Client, error) {
 	return &CosmosClient{
-		txConfig: f.txConfig,
-		kr:       f.kr,
+		clientCtx: f.clientCtx,
 	}, nil
 }
 
@@ -61,13 +57,13 @@ func (f *CosmosClientFactory) NewClient(cfg loadtest.Config) (loadtest.Client, e
 // loadtest package, so don't worry about that. Only return an error here if you
 // want to completely fail the entire load test operation.
 func (c *CosmosClient) GenerateTx() ([]byte, error) {
-	txBuilder := c.txConfig.NewTxBuilder()
-	r1, err := c.kr.Key("user1")
+	txBuilder := c.clientCtx.TxConfig.NewTxBuilder()
+	r1, err := c.clientCtx.Keyring.Key("user1")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user1 key: %w", err)
 	}
 
-	r2, err := c.kr.Key("user2")
+	r2, err := c.clientCtx.Keyring.Key("user2")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user2 key: %w", err)
 	}
@@ -94,11 +90,10 @@ func (c *CosmosClient) GenerateTx() ([]byte, error) {
 	}
 
 	txBuilder.SetGasLimit(200000)
-	txBuilder.SetFeeAmount(types.NewCoins(types.NewInt64Coin("umfx", 5)))
-	txBuilder.SetMemo("manifest-load-test")
-	txBuilder.SetTimeoutHeight(5)
+	txBuilder.SetFeeAmount(types.NewCoins(types.NewInt64Coin("umfx", rand.Int63n(10)+1)))
+	txBuilder.SetMemo(randomString(10))
 
-	defaultSignMode, err := authsigning.APISignModeToInternal(c.txConfig.SignModeHandler().DefaultMode())
+	defaultSignMode, err := authsigning.APISignModeToInternal(c.clientCtx.TxConfig.SignModeHandler().DefaultMode())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get default sign mode: %w", err)
 	}
@@ -106,6 +101,11 @@ func (c *CosmosClient) GenerateTx() ([]byte, error) {
 	r1Pub, err := r1.GetPubKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public key from record 1: %w", err)
+	}
+
+	acc1, err := c.clientCtx.AccountRetriever.GetAccount(c.clientCtx, addr1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account number: %w", err)
 	}
 
 	// First round: we gather all the signer infos. We use the "set empty
@@ -117,7 +117,7 @@ func (c *CosmosClient) GenerateTx() ([]byte, error) {
 			SignMode:  defaultSignMode,
 			Signature: nil,
 		},
-		Sequence: 0,
+		Sequence: acc1.GetSequence(),
 	}
 	err = txBuilder.SetSignatures(sigV2)
 	if err != nil {
@@ -137,15 +137,15 @@ func (c *CosmosClient) GenerateTx() ([]byte, error) {
 
 	// Second round: all signer infos are set, so each signer can sign.
 	signerData := authsigning.SignerData{
-		ChainID:       "manifest-beta-chain",
-		AccountNumber: 0,
-		Sequence:      0,
+		ChainID:       c.clientCtx.ChainID,
+		AccountNumber: acc1.GetAccountNumber(),
+		Sequence:      acc1.GetSequence(),
 		PubKey:        r1Pub,
 	}
 
 	sigV2, err = tx.SignWithPrivKey(
 		context.TODO(), defaultSignMode, signerData,
-		txBuilder, r1Priv, c.txConfig, 0)
+		txBuilder, r1Priv, c.clientCtx.TxConfig, acc1.GetSequence())
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign with private key: %w", err)
 	}
@@ -155,5 +155,15 @@ func (c *CosmosClient) GenerateTx() ([]byte, error) {
 		return nil, fmt.Errorf("failed to set signature: %w", err)
 	}
 
-	return c.txConfig.TxEncoder()(txBuilder.GetTx())
+	return c.clientCtx.TxConfig.TxEncoder()(txBuilder.GetTx())
+}
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+func randomString(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
 }
