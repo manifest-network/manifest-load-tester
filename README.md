@@ -23,9 +23,11 @@ Create a `.env` file in the root of the project with the following content:
 ```bash
 USER1_MNEMONIC="your mnemonic here"
 USER2_MNEMONIC="your mnemonic here"  
+CHAIN_ID="your chain-id here"
+RPC_URL="your rpc url here"
 ````
 
-where `USER1_MNEMONIC` and `USER2_MNEMONIC` are the mnemonics of the accounts you want to use for the load test.
+where `USER1_MNEMONIC` and `USER2_MNEMONIC` are the mnemonics of the accounts you want to use for the load test, `CHAIN_ID` is the chain ID of the network you want to test, and `RPC_URL` is the URL of the RPC endpoint of the network you want to test.
 
 Tokens will be transferred from `USER1_MNEMONIC` to `USER2_MNEMONIC` during the load test.
 
