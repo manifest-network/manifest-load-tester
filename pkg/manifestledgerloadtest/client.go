@@ -15,17 +15,26 @@ import (
 )
 import "github.com/cometbft/cometbft-load-test/pkg/loadtest"
 
+type Params struct {
+	Fee      int64
+	Amount   int64
+	Denom    string
+	GasLimit uint64
+}
+
 // CosmosClientFactory creates instances of CosmosClient
 type CosmosClientFactory struct {
 	clientCtx client.Context
+	params    Params
 }
 
 // CosmosClientFactory implements loadtest.ClientFactory
 var _ loadtest.ClientFactory = (*CosmosClientFactory)(nil)
 
-func NewCosmosClientFactory(clientCtx client.Context) *CosmosClientFactory {
+func NewCosmosClientFactory(clientCtx client.Context, params Params) *CosmosClientFactory {
 	return &CosmosClientFactory{
 		clientCtx: clientCtx,
+		params:    params,
 	}
 }
 
@@ -35,6 +44,7 @@ func NewCosmosClientFactory(clientCtx client.Context) *CosmosClientFactory {
 // thread-safe manner.
 type CosmosClient struct {
 	clientCtx client.Context
+	params    Params
 }
 
 // CosmosClient implements loadtest.Client
@@ -49,6 +59,7 @@ func (f *CosmosClientFactory) ValidateConfig(cfg loadtest.Config) error {
 func (f *CosmosClientFactory) NewClient(cfg loadtest.Config) (loadtest.Client, error) {
 	return &CosmosClient{
 		clientCtx: f.clientCtx,
+		params:    f.params,
 	}, nil
 }
 
@@ -78,8 +89,7 @@ func (c *CosmosClient) GenerateTx() ([]byte, error) {
 		return nil, fmt.Errorf("failed to get address from record 2: %w", err)
 	}
 
-	// Construct a message to send 1 umfx from addr1 to addr2
-	msg1 := banktypes.NewMsgSend(addr1, addr2, types.NewCoins(types.NewInt64Coin("umfx", 1)))
+	msg1 := banktypes.NewMsgSend(addr1, addr2, types.NewCoins(types.NewInt64Coin(c.params.Denom, c.params.Amount)))
 	if msg1 == nil {
 		return nil, fmt.Errorf("failed to create message")
 	}
@@ -89,8 +99,8 @@ func (c *CosmosClient) GenerateTx() ([]byte, error) {
 		return nil, fmt.Errorf("failed to set message: %w", err)
 	}
 
-	txBuilder.SetGasLimit(200000)
-	txBuilder.SetFeeAmount(types.NewCoins(types.NewInt64Coin("umfx", rand.Int63n(10)+1)))
+	txBuilder.SetGasLimit(c.params.GasLimit)
+	txBuilder.SetFeeAmount(types.NewCoins(types.NewInt64Coin(c.params.Denom, c.params.Fee)))
 	txBuilder.SetMemo(randomString(10))
 
 	defaultSignMode, err := authsigning.APISignModeToInternal(c.clientCtx.TxConfig.SignModeHandler().DefaultMode())

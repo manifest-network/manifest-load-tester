@@ -3,6 +3,7 @@ package main
 import (
 	"log/slog"
 	"os"
+	"strconv"
 
 	"github.com/cometbft/cometbft-load-test/pkg/loadtest"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -87,6 +88,35 @@ func main() {
 		panic("RPC_URL env var not set")
 	}
 
+	feeStr := os.Getenv("FEE")
+	if feeStr == "" {
+		panic("FEE env var not set")
+	}
+	fee, err := strconv.ParseInt(feeStr, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+
+	amountStr := os.Getenv("AMOUNT")
+	if amountStr == "" {
+		panic("AMOUNT env var not set")
+	}
+	amount, err := strconv.ParseInt(amountStr, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+
+	denom := os.Getenv("DENOM")
+	if denom == "" {
+		panic("DENOM env var not set")
+	}
+
+	gasLimitStr := os.Getenv("GAS_LIMIT")
+	if gasLimitStr == "" {
+		panic("GAS_LIMIT env var not set")
+	}
+	gasLimit, err := strconv.ParseUint(gasLimitStr, 10, 64)
+
 	types.GetConfig().SetBech32PrefixForAccount("manifest", "manifestpub")
 
 	rpcClient, err := client.NewClientFromNode(rpcUrl)
@@ -127,7 +157,12 @@ func main() {
 	}
 	slog.Info("User2 address: ", "addr", addr2.String())
 
-	cosmosClientFactory := manifestledgerloadtest.NewCosmosClientFactory(clientCtx)
+	cosmosClientFactory := manifestledgerloadtest.NewCosmosClientFactory(clientCtx, manifestledgerloadtest.Params{
+		Amount:   amount,
+		GasLimit: gasLimit,
+		Denom:    denom,
+		Fee:      fee,
+	})
 	if err := loadtest.RegisterClientFactory("manifest-ledger-load-test", cosmosClientFactory); err != nil {
 		panic(err)
 	}
