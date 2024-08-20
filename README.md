@@ -62,3 +62,14 @@ See the help message for more information:
 ### Coordinator/Worker
 
 TODO
+
+## Notes
+
+The load tester is limited by how CosmosSDK handles (ordered) transactions. Most transactions will get rejected by the mempool (due to sequence number issues) and will not be included in the block. This is expected behavior.
+
+Unordered transactions should be supported by a future CosmosSDK version. See [ADR-070](https://github.com/cosmos/cosmos-sdk/blob/main/docs/architecture/adr-070-unordered-transactions.md) for more information.
+
+### TODO
+
+- Script to generate a large number of accounts and fund them with tokens.
+- Adapt load tester to use multiple accounts for sending transactions.
