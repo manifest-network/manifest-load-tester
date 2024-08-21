@@ -7,6 +7,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
+	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
@@ -16,6 +17,7 @@ import (
 import "github.com/cometbft/cometbft-load-test/pkg/loadtest"
 
 type Params struct {
+	Users    []*keyring.Record
 	Fee      int64
 	Amount   int64
 	Denom    string
@@ -69,21 +71,14 @@ func (f *CosmosClientFactory) NewClient(cfg loadtest.Config) (loadtest.Client, e
 // want to completely fail the entire load test operation.
 func (c *CosmosClient) GenerateTx() ([]byte, error) {
 	txBuilder := c.clientCtx.TxConfig.NewTxBuilder()
-	r1, err := c.clientCtx.Keyring.Key("user1")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user1 key: %w", err)
-	}
-
-	r2, err := c.clientCtx.Keyring.Key("user2")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get user2 key: %w", err)
-	}
+	userRandomIdx := rand.Perm(len(c.params.Users))[0:2]
+	r1 := c.params.Users[userRandomIdx[0]]
+	r2 := c.params.Users[userRandomIdx[1]]
 
 	addr1, err := r1.GetAddress()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get address from record 1: %w", err)
 	}
-
 	addr2, err := r2.GetAddress()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get address from record 2: %w", err)

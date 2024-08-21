@@ -5,20 +5,20 @@
 CHAIN_CMD="manifestd"
 
 usage() {
-  echo "Usage: $0 -n <number_of_accounts> -c <csv_output_file> -g <genesis_output_file>"
+  echo "Usage: $0 -n <number_of_accounts> -m <mnemonics_output_file> -g <genesis_output_file>"
   exit 1
 }
 
-while getopts "n:c:g:" opt; do
+while getopts "n:m:g:" opt; do
   case $opt in
     n) NB_ACCOUNTS=$OPTARG ;;
-    c) CSV_OUTPUT=$OPTARG ;;
+    m) MNEMONICS_OUTPUT=$OPTARG ;;
     g) GENESIS_OUTPUT=$OPTARG ;;
     *) usage ;;
   esac
 done
 
-if [[ -z "$NB_ACCOUNTS" || -z "$CSV_OUTPUT" || -z "$GENESIS_OUTPUT" ]]; then
+if [[ -z "$NB_ACCOUNTS" || -z "$MNEMONICS_OUTPUT" || -z "$GENESIS_OUTPUT" ]]; then
   usage
 fi
 
@@ -33,6 +33,11 @@ COUNTER=1
 
 trap 'rm -rf -- "$WORKDIR"' EXIT
 
+# Overwrite the mnemonic file if it exists
+if [[ -f "$MNEMONICS_OUTPUT" ]]; then
+  true > "$MNEMONICS_OUTPUT"
+fi
+
 echo "Generating $1 mnemonics..."
 
 for ((i=1; i <= NB_ACCOUNTS; i++));
@@ -45,7 +50,7 @@ while IFS="" read -r mnemonic || [ -n "$mnemonic" ]
 do
   KEY="user$COUNTER"
   ADDR=$(echo "$mnemonic" | $CHAIN_CMD keys add $KEY --keyring-backend memory --recover --home="$WORKDIR" 2>/dev/null | grep "address" | awk '{print $3}')
-  printf "%s, %s\n" "$ADDR" "$mnemonic" >> "$CSV_OUTPUT"
+  printf "%s\n" "$mnemonic" >> "$MNEMONICS_OUTPUT"
   ACCOUNTS+=("$ADDR")
   ((COUNTER++))
 done < "$MNEMONICS_FILE"

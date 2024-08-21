@@ -1,7 +1,8 @@
 package main
 
 import (
-	"log/slog"
+	"bufio"
+	"fmt"
 	"os"
 	"strconv"
 
@@ -62,20 +63,35 @@ func defaultEncoding() testutil.TestEncodingConfig {
 	)
 }
 
+func readLines(filePath string) ([]string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	return lines, nil
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
 		panic("Error loading .env file")
 	}
 
-	user1Mnemonic := os.Getenv("USER1_MNEMONIC")
-	if user1Mnemonic == "" {
-		panic("USER1_MNEMONIC env var not set")
-	}
-
-	user2Mnemonic := os.Getenv("USER2_MNEMONIC")
-	if user2Mnemonic == "" {
-		panic("USER2_MNEMONIC env var not set")
+	userMnemonicsFile := os.Getenv("USER_MNEMONICS_FILE")
+	if userMnemonicsFile == "" {
+		panic("USER_MNEMONICS_FILE env var not set")
 	}
 
 	chainId := os.Getenv("CHAIN_ID")
@@ -137,27 +153,26 @@ func main() {
 		WithInterfaceRegistry(enc.InterfaceRegistry).
 		WithTxConfig(txConfig)
 
-	user1, err := recordFromMnmonic(kr, "user1", user1Mnemonic)
+	mnemonics, err := readLines(userMnemonicsFile)
 	if err != nil {
 		panic(err)
 	}
-	addr1, err := user1.GetAddress()
-	if err != nil {
-		panic(err)
-	}
-	slog.Info("User1 address: ", "addr", addr1.String())
 
-	user2, err := recordFromMnmonic(kr, "user2", user2Mnemonic)
-	if err != nil {
-		panic(err)
+	var records []*keyring.Record
+	for i, mnemonic := range mnemonics {
+		record, err := recordFromMnmonic(kr, fmt.Sprintf("user%d", i), mnemonic)
+		if err != nil {
+			panic(err)
+		}
+		records = append(records, record)
 	}
-	addr2, err := user2.GetAddress()
-	if err != nil {
-		panic(err)
+
+	if len(records) < 2 {
+		panic("not enough users to pick two random entries")
 	}
-	slog.Info("User2 address: ", "addr", addr2.String())
 
 	cosmosClientFactory := manifestledgerloadtest.NewCosmosClientFactory(clientCtx, manifestledgerloadtest.Params{
+		Users:    records,
 		Amount:   amount,
 		GasLimit: gasLimit,
 		Denom:    denom,
