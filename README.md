@@ -69,7 +69,12 @@ The load tester is limited by how CosmosSDK handles (ordered) transactions. Most
 
 Unordered transactions should be supported by a future CosmosSDK version. See [ADR-070](https://github.com/cosmos/cosmos-sdk/blob/main/docs/architecture/adr-070-unordered-transactions.md) for more information.
 
-### TODO
+## Tools
 
-- Script to generate a large number of accounts and fund them with tokens.
+The `scripts` directory contains a few useful scripts:
+
+- `generate_accounts.sh`: Save addresses and mnemonics in a file and generate a genesis balance segment for each address.
+
+## TODO
+
 - Adapt load tester to use multiple accounts for sending transactions.
