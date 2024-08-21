@@ -7,6 +7,7 @@ This software is designed to test the performance of the Manifest Network by sen
 ## Requirements
 
 - Go 1.22
+- jq 1.6
 
 ## Building the binary
 
@@ -21,17 +22,20 @@ go build -o ./build/manifest-load-tester ./cmd/manifest-load-tester/main.go
 Create a `.env` file in the root of the project with the following content:
 
 ```bash
-USER1_MNEMONIC="your mnemonic here"
-USER2_MNEMONIC="your mnemonic here"  
+USER_MNEMONICS_FILE="path to file with user mnemonics"
 CHAIN_ID="your chain-id here"
 RPC_URL="your rpc url here"
 ````
 
-where `USER1_MNEMONIC` and `USER2_MNEMONIC` are the mnemonics of the accounts you want to use for the load test, `CHAIN_ID` is the chain ID of the network you want to test, and `RPC_URL` is the URL of the RPC endpoint of the network you want to test.
+where `USER_MNEMONICS_FILE` is the file containing the mnemonics (one per line) of the accounts you want to use for the load test, `CHAIN_ID` is the chain ID of the network you want to test, and `RPC_URL` is the URL of the RPC endpoint of the network you want to test.
 
-Tokens will be transferred from `USER1_MNEMONIC` to `USER2_MNEMONIC` during the load test.
+Tokens will be transferred from a randomly selected account in the `USER_MNEMONICS_FILE` file to another randomly selected account in the same file.
 
-The `USER1_MNEMONIC` account should be funded with enough tokens to cover the cost of the transactions.
+The `USER_MNEMONICS_FILE` file can be generated using the `generate_accounts.sh` script in the `scripts` directory.
+
+The `generate_accounts.sh` script will also generate a genesis balance segment for each account in the `USER_MNEMONICS_FILE` file. This segment should be added to the genesis file of the network you want to test. 
+
+See the tools section below for more information.
 
 ## Running the load test
 
@@ -71,10 +75,12 @@ Unordered transactions should be supported by a future CosmosSDK version. See [A
 
 ## Tools
 
-The `scripts` directory contains a few useful scripts:
+The `scripts` directory contains the `generate_accounts.sh` script, which can be used to generate accounts and mnemonics for the load test.
 
-- `generate_accounts.sh`: Save addresses and mnemonics in a file and generate a genesis balance segment for each address.
+```bash
+# Generate 25 accounts 
+# The `mnenomics.txt` file will contain the mnemonics of the generated accounts, one per line. 
+# The `genesis_balance.json` file will contain the genesis balance segment for each account.
+./scripts/generate_accounts.sh -n 25 -m mnemonics.txt -g genesis_balance.json
+```
 
-## TODO
-
-- Adapt load tester to use multiple accounts for sending transactions.
