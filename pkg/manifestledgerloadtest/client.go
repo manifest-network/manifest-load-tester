@@ -9,35 +9,43 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
-	"github.com/cosmos/cosmos-sdk/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	txsgen "github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/txs"
+	manitesttypes "github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/types"
+	"github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/utils"
 )
 import "github.com/cometbft/cometbft-load-test/pkg/loadtest"
-
-type Params struct {
-	Users    []*keyring.Record
-	Fee      int64
-	Amount   int64
-	Denom    string
-	GasLimit uint64
-}
 
 // CosmosClientFactory creates instances of CosmosClient
 type CosmosClientFactory struct {
 	clientCtx client.Context
-	params    Params
+	params    manitesttypes.Params
+	txGens    map[string]txsgen.TxGenerator
+	txWeights map[string]int
 }
 
 // CosmosClientFactory implements loadtest.ClientFactory
 var _ loadtest.ClientFactory = (*CosmosClientFactory)(nil)
 
-func NewCosmosClientFactory(clientCtx client.Context, params Params) *CosmosClientFactory {
-	return &CosmosClientFactory{
+func NewCosmosClientFactory(clientCtx client.Context, params manitesttypes.Params) *CosmosClientFactory {
+	cosmosClient := &CosmosClientFactory{
 		clientCtx: clientCtx,
 		params:    params,
+		txGens:    make(map[string]txsgen.TxGenerator),
+		txWeights: make(map[string]int),
 	}
+
+	//cosmosClient.RegisterTxGenerator("bank_send", &txsgen.BankSendTxGenerator{}, 1)
+	cosmosClient.RegisterTxGenerator("create_group", &txsgen.CreateGroupTxGenerator{}, 1)
+
+	return cosmosClient
+}
+
+func (c *CosmosClientFactory) RegisterTxGenerator(name string, gen txsgen.TxGenerator, weight int) {
+	c.txGens[name] = gen
+	c.txWeights[name] = weight
 }
 
 // CosmosClient is responsible for generating transactions. Only one client
@@ -46,7 +54,9 @@ func NewCosmosClientFactory(clientCtx client.Context, params Params) *CosmosClie
 // thread-safe manner.
 type CosmosClient struct {
 	clientCtx client.Context
-	params    Params
+	params    manitesttypes.Params
+	txGens    map[string]txsgen.TxGenerator
+	txWeights map[string]int
 }
 
 // CosmosClient implements loadtest.Client
@@ -62,6 +72,8 @@ func (f *CosmosClientFactory) NewClient(cfg loadtest.Config) (loadtest.Client, e
 	return &CosmosClient{
 		clientCtx: f.clientCtx,
 		params:    f.params,
+		txGens:    f.txGens,
+		txWeights: f.txWeights,
 	}, nil
 }
 
@@ -70,87 +82,121 @@ func (f *CosmosClientFactory) NewClient(cfg loadtest.Config) (loadtest.Client, e
 // loadtest package, so don't worry about that. Only return an error here if you
 // want to completely fail the entire load test operation.
 func (c *CosmosClient) GenerateTx() ([]byte, error) {
+	txType := c.selectTxType()
+	generator, ok := c.txGens[txType]
+	if !ok {
+		return nil, fmt.Errorf("unknown transaction type: %s", txType)
+	}
+
+	sender, msg, err := generator.GenerateMsg(c.clientCtx, c.params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate message: %w", err)
+	}
+
+	return c.buildAndSignTx(sender, msg)
+}
+
+func (c *CosmosClient) selectTxType() string {
+	if len(c.txGens) == 1 {
+		for txType := range c.txGens {
+			return txType
+		}
+	}
+
+	var totalWeight int
+	for _, weight := range c.txWeights {
+		totalWeight += weight
+	}
+
+	r := rand.Intn(totalWeight)
+	var cumulativeWeight int
+	for txType, weight := range c.txWeights {
+		cumulativeWeight += weight
+		if r < cumulativeWeight {
+			return txType
+		}
+	}
+
+	for txType := range c.txGens {
+		return txType
+	}
+	return ""
+}
+
+func (c *CosmosClient) buildAndSignTx(sender *keyring.Record, msg sdk.Msg) ([]byte, error) {
 	txBuilder := c.clientCtx.TxConfig.NewTxBuilder()
-	userRandomIdx := rand.Perm(len(c.params.Users))[0:2]
-	r1 := c.params.Users[userRandomIdx[0]]
-	r2 := c.params.Users[userRandomIdx[1]]
 
-	addr1, err := r1.GetAddress()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get address from record 1: %w", err)
-	}
-	addr2, err := r2.GetAddress()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get address from record 2: %w", err)
-	}
-
-	msg1 := banktypes.NewMsgSend(addr1, addr2, types.NewCoins(types.NewInt64Coin(c.params.Denom, c.params.Amount)))
-	if msg1 == nil {
-		return nil, fmt.Errorf("failed to create message")
-	}
-
-	err = txBuilder.SetMsgs(msg1)
+	err := txBuilder.SetMsgs(msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set message: %w", err)
 	}
 
 	txBuilder.SetGasLimit(c.params.GasLimit)
-	txBuilder.SetFeeAmount(types.NewCoins(types.NewInt64Coin(c.params.Denom, c.params.Fee)))
-	txBuilder.SetMemo(randomString(10))
+	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewInt64Coin(c.params.Denom, c.params.Fee)))
+	txBuilder.SetMemo(utils.RandomString(255))
+
+	return c.signTx(sender, txBuilder)
+}
+
+func (c *CosmosClient) signTx(sender *keyring.Record, txBuilder client.TxBuilder) ([]byte, error) {
+	addr, err := sender.GetAddress()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get address: %w", err)
+	}
 
 	defaultSignMode, err := authsigning.APISignModeToInternal(c.clientCtx.TxConfig.SignModeHandler().DefaultMode())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get default sign mode: %w", err)
 	}
 
-	r1Pub, err := r1.GetPubKey()
+	senderPub, err := sender.GetPubKey()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get public key from record 1: %w", err)
+		return nil, fmt.Errorf("failed to get public key: %w", err)
 	}
 
-	acc1, err := c.clientCtx.AccountRetriever.GetAccount(c.clientCtx, addr1)
+	acc, err := c.clientCtx.AccountRetriever.GetAccount(c.clientCtx, addr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get account number: %w", err)
+		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
 
-	// First round: we gather all the signer infos. We use the "set empty
-	// signature" hack to do that.
-	// https://github.com/cosmos/cosmos-sdk/blob/6f30de3a41d37a4359751f9d9e508b28fc620697/baseapp/msg_service_router_test.go#L169
+	// First round: set empty signature to gather signer infos
 	sigV2 := signing.SignatureV2{
-		PubKey: r1Pub,
+		PubKey: senderPub,
 		Data: &signing.SingleSignatureData{
 			SignMode:  defaultSignMode,
 			Signature: nil,
 		},
-		Sequence: acc1.GetSequence(),
+		Sequence: acc.GetSequence(),
 	}
+
 	err = txBuilder.SetSignatures(sigV2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set signature: %w", err)
 	}
 
-	r1Local := r1.GetLocal()
-	r1PrivAny := r1Local.PrivKey
-	if r1PrivAny == nil {
+	// Get private key
+	senderLocal := sender.GetLocal()
+	senderPrivAny := senderLocal.PrivKey
+	if senderPrivAny == nil {
 		return nil, fmt.Errorf("private key is nil")
 	}
 
-	r1Priv, ok := r1PrivAny.GetCachedValue().(cryptotypes.PrivKey)
+	senderPriv, ok := senderPrivAny.GetCachedValue().(cryptotypes.PrivKey)
 	if !ok {
-		return nil, fmt.Errorf("failed to cast private key from record 1")
+		return nil, fmt.Errorf("failed to cast private key")
 	}
 
-	// Second round: all signer infos are set, so each signer can sign.
+	// Second round: sign with private key
 	signerData := authsigning.SignerData{
 		ChainID:       c.clientCtx.ChainID,
-		AccountNumber: acc1.GetAccountNumber(),
-		Sequence:      acc1.GetSequence(),
-		PubKey:        r1Pub,
+		AccountNumber: acc.GetAccountNumber(),
+		Sequence:      acc.GetSequence(),
+		PubKey:        senderPub,
 	}
 
 	sigV2, err = tx.SignWithPrivKey(
 		context.TODO(), defaultSignMode, signerData,
-		txBuilder, r1Priv, c.clientCtx.TxConfig, acc1.GetSequence())
+		txBuilder, senderPriv, c.clientCtx.TxConfig, acc.GetSequence())
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign with private key: %w", err)
 	}
@@ -161,14 +207,4 @@ func (c *CosmosClient) GenerateTx() ([]byte, error) {
 	}
 
 	return c.clientCtx.TxConfig.TxEncoder()(txBuilder.GetTx())
-}
-
-const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-func randomString(length int) string {
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(b)
 }
