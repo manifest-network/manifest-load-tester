@@ -5,7 +5,7 @@ go 1.22.11
 replace github.com/cosmos/cosmos-sdk => github.com/liftedinit/cosmos-sdk v0.50.12-liftedinit.1
 
 require (
-	github.com/cometbft/cometbft-load-test v0.2.0
+	github.com/cometbft/cometbft-load-test v0.3.0
 	github.com/cosmos/cosmos-sdk v0.50.12
 	github.com/joho/godotenv v1.5.1
 )
