@@ -30,6 +30,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	"github.com/joho/godotenv"
 	"github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest"
+	manifesttypes "github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/types"
 )
 
 const CoinType = 118
@@ -133,6 +134,12 @@ func main() {
 	}
 	gasLimit, err := strconv.ParseUint(gasLimitStr, 10, 64)
 
+	createGroupMetadataSizeStr := os.Getenv("CREATE_GROUP_METADATA_SIZE")
+	if createGroupMetadataSizeStr == "" {
+		panic("CREATE_GROUP_METADATA_SIZE env var not set) }")
+	}
+	createGroupMetadataSize, err := strconv.ParseUint(createGroupMetadataSizeStr, 10, 64)
+
 	types.GetConfig().SetBech32PrefixForAccount("manifest", "manifestpub")
 
 	rpcClient, err := client.NewClientFromNode(rpcUrl)
@@ -171,12 +178,13 @@ func main() {
 		panic("not enough users to pick two random entries")
 	}
 
-	cosmosClientFactory := manifestledgerloadtest.NewCosmosClientFactory(clientCtx, manifestledgerloadtest.Params{
-		Users:    records,
-		Amount:   amount,
-		GasLimit: gasLimit,
-		Denom:    denom,
-		Fee:      fee,
+	cosmosClientFactory := manifestledgerloadtest.NewCosmosClientFactory(clientCtx, manifesttypes.Params{
+		Users:                   records,
+		Amount:                  amount,
+		GasLimit:                gasLimit,
+		Denom:                   denom,
+		Fee:                     fee,
+		CreateGroupMetadataSize: createGroupMetadataSize,
 	})
 	if err := loadtest.RegisterClientFactory("manifest-ledger-load-test", cosmosClientFactory); err != nil {
 		panic(err)
