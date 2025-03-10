@@ -25,15 +25,31 @@ Create a `.env` file in the root of the project with the following content:
 USER_MNEMONICS_FILE="path to file with user mnemonics"
 CHAIN_ID="your chain-id here"
 RPC_URL="your rpc url here"
+DENOM=umfx
+AMOUNT=1
+GAS_LIMIT=20000000
+FEE=100000
+CREATE_GROUP_METADATA_SIZE=2048
 ````
 
-where `USER_MNEMONICS_FILE` is the file containing the mnemonics (one per line) of the accounts you want to use for the load test, `CHAIN_ID` is the chain ID of the network you want to test, and `RPC_URL` is the URL of the RPC endpoint of the network you want to test.
+where `USER_MNEMONICS_FILE` is the file containing the mnemonics (one per line) of the accounts you want to use for the load test, 
+      `CHAIN_ID` is the chain ID of the network you want to test, 
+      `RPC_URL` is the URL of the RPC endpoint of the network you want to test, 
+      `DENOM` is the denomination of the token you want to use for the load test, 
+      `AMOUNT` is the amount of tokens to send in each transaction, 
+      `GAS_LIMIT` is the gas limit for each transaction, 
+      `FEE` is the fee for each transaction, and 
+      `CREATE_GROUP_METADATA_SIZE` is the size of the metadata for the group creation transaction.
 
-Tokens will be transferred from a randomly selected account in the `USER_MNEMONICS_FILE` file to another randomly selected account in the same file.
+Two transaction types are supported: `create_group` and `send`. The load tester will randomly select one of the two transaction types for each transaction.
+
+The `send` transaction will transfer tokens from a randomly selected account in the `USER_MNEMONICS_FILE` file to another randomly selected account in the same file.
+The `create_group` transaction will create a group with a randomly selected account in the `USER_MNEMONICS_FILE` file as the group creator and group member. The group metadata will be a random string of size `CREATE_GROUP_METADATA_SIZE` bytes.
 
 The `USER_MNEMONICS_FILE` file can be generated using the `generate_accounts.sh` script in the `scripts` directory.
 
 The `generate_accounts.sh` script will also generate a genesis balance segment for each account in the `USER_MNEMONICS_FILE` file. This segment should be added to the genesis file of the network you want to test. 
+The `fund_accounts.sh` script can be used to fund the accounts with the generated genesis balance segment.
 
 See the tools section below for more information.
 
@@ -82,5 +98,13 @@ The `scripts` directory contains the `generate_accounts.sh` script, which can be
 # The `mnenomics.txt` file will contain the mnemonics of the generated accounts, one per line. 
 # The `genesis_balance.json` file will contain the genesis balance segment for each account.
 ./scripts/generate_accounts.sh -n 25 -m mnemonics.txt -g genesis_balance.json
+```
+
+The `fund_accounts.sh` script can be used to fund the accounts with the generated genesis balance segment.
+
+```bash 
+# Fund the accounts with the generated genesis balance segment
+# The `genesis_balance.json` file will be used to fund the accounts.
+./scripts/fund_accounts.sh genesis_balance.json
 ```
 
