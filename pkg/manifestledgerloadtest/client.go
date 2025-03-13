@@ -37,8 +37,8 @@ func NewCosmosClientFactory(clientCtx client.Context, params manitesttypes.Param
 		txWeights: make(map[string]int),
 	}
 
-	cosmosClient.RegisterTxGenerator("bank_send", &txsgen.BankSendTxGenerator{}, 0.5)
-	cosmosClient.RegisterTxGenerator("create_group", &txsgen.CreateGroupTxGenerator{}, 0.5)
+	cosmosClient.RegisterTxGenerator("bank_send", &txsgen.BankSendTxGenerator{}, 1)
+	cosmosClient.RegisterTxGenerator("create_group", &txsgen.CreateGroupTxGenerator{}, 1)
 
 	return cosmosClient
 }
