@@ -7,8 +7,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/types"
 	grouptypes "github.com/cosmos/cosmos-sdk/x/group"
-	manifesttypes "github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/types"
-	"github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/utils"
+	manifesttypes "github.com/manifest-network/manifest-load-tester/pkg/manifestledgerloadtest/types"
+	"github.com/manifest-network/manifest-load-tester/pkg/manifestledgerloadtest/utils"
 )
 
 type CreateGroupTxGenerator struct{}

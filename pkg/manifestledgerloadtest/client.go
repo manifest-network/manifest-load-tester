@@ -12,9 +12,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
-	txsgen "github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/txs"
-	manitesttypes "github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/types"
-	"github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/utils"
+	txsgen "github.com/manifest-network/manifest-load-tester/pkg/manifestledgerloadtest/txs"
+	manitesttypes "github.com/manifest-network/manifest-load-tester/pkg/manifestledgerloadtest/types"
+	"github.com/manifest-network/manifest-load-tester/pkg/manifestledgerloadtest/utils"
 )
 import "github.com/cometbft/cometbft-load-test/pkg/loadtest"
 

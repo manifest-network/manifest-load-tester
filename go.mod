@@ -1,4 +1,4 @@
-module github.com/liftedinit/manifest-load-tester
+module github.com/manifest-network/manifest-load-tester
 
 go 1.24.6
 

@@ -8,7 +8,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	"github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	manifesttypes "github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/types"
+	manifesttypes "github.com/manifest-network/manifest-load-tester/pkg/manifestledgerloadtest/types"
 )
 
 type BankSendTxGenerator struct{}
