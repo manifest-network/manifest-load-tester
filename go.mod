@@ -1,12 +1,12 @@
 module github.com/liftedinit/manifest-load-tester
 
-go 1.23.10
+go 1.24.6
 
-replace github.com/cosmos/cosmos-sdk => github.com/liftedinit/cosmos-sdk v0.50.13-liftedinit.1
+replace github.com/cosmos/cosmos-sdk => github.com/manifest-network/cosmos-sdk v0.50.14-liftedinit.1
 
 require (
 	github.com/cometbft/cometbft-load-test v0.3.0
-	github.com/cosmos/cosmos-sdk v0.50.13
+	github.com/cosmos/cosmos-sdk v0.50.14
 	github.com/joho/godotenv v1.5.1
 )
 
