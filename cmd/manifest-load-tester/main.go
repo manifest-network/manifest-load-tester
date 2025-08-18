@@ -29,8 +29,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/slashing"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	"github.com/joho/godotenv"
-	"github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest"
-	manifesttypes "github.com/liftedinit/manifest-load-tester/pkg/manifestledgerloadtest/types"
+	"github.com/manifest-network/manifest-load-tester/pkg/manifestledgerloadtest"
+	manifesttypes "github.com/manifest-network/manifest-load-tester/pkg/manifestledgerloadtest/types"
 )
 
 const CoinType = 118
